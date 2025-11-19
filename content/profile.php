@@ -96,13 +96,15 @@ if ($role == 'ditbinmas') $role_display = 'Ditbinmas';
 <style>
     .profile-card {
         border-radius: 15px;
-        border: none;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        border: 2px solid #FFD700;
+        box-shadow: 0 4px 15px rgba(26, 31, 58, 0.15);
         overflow: hidden;
+        background: #fff;
     }
 
     .profile-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: #1a1f3a;
+        border-bottom: 3px solid #FFD700;
         color: white;
         padding: 40px 30px;
         text-align: center;
@@ -112,15 +114,16 @@ if ($role == 'ditbinmas') $role_display = 'Ditbinmas';
         width: 120px;
         height: 120px;
         border-radius: 50%;
-        background: white;
+        background: #FFD700;
+        border: 3px solid white;
         display: flex;
         align-items: center;
         justify-content: center;
         margin: 0 auto 20px;
         font-size: 3rem;
         font-weight: 700;
-        color: #667eea;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        color: #1a1f3a;
+        box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4);
     }
 
     .profile-name {
@@ -138,9 +141,10 @@ if ($role == 'ditbinmas') $role_display = 'Ditbinmas';
     .profile-stats {
         display: flex;
         justify-content: space-around;
-        padding: 20px 0;
-        background: rgba(255, 255, 255, 0.1);
+        padding: 20px;
+        background: rgba(255, 215, 0, 0.1);
         border-radius: 10px;
+        border: 1px solid rgba(255, 215, 0, 0.3);
     }
 
     .stat-item {
@@ -150,27 +154,30 @@ if ($role == 'ditbinmas') $role_display = 'Ditbinmas';
     .stat-number {
         font-size: 2rem;
         font-weight: 700;
+        color: #FFD700;
     }
 
     .stat-label {
         font-size: 0.875rem;
-        opacity: 0.9;
+        color: #fff;
+        opacity: 0.95;
     }
 
     .form-section {
         background: #fff;
         border-radius: 15px;
         padding: 30px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 15px rgba(26, 31, 58, 0.15);
+        border: 2px solid rgba(255, 215, 0, 0.3);
         margin-bottom: 20px;
     }
 
     .form-section h5 {
-        color: #667eea;
+        color: #1a1f3a;
         font-weight: 700;
         margin-bottom: 20px;
         padding-bottom: 10px;
-        border-bottom: 2px solid #e9ecef;
+        border-bottom: 3px solid #FFD700;
     }
 
     .info-row {
@@ -185,7 +192,7 @@ if ($role == 'ditbinmas') $role_display = 'Ditbinmas';
 
     .info-label {
         font-weight: 600;
-        color: #6c757d;
+        color: #1a1f3a;
         width: 200px;
         flex-shrink: 0;
     }
@@ -196,32 +203,118 @@ if ($role == 'ditbinmas') $role_display = 'Ditbinmas';
     }
 
     .btn-update {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border: none;
+        background: #FFD700;
+        border: 2px solid #1a1f3a;
         padding: 12px 40px;
         border-radius: 8px;
-        color: white;
+        color: #1a1f3a;
         font-weight: 600;
         transition: all 0.3s ease;
     }
 
     .btn-update:hover {
         transform: translateY(-2px);
-        box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-        color: white;
+        box-shadow: 0 5px 20px rgba(255, 215, 0, 0.5);
+        background: #1a1f3a;
+        color: #FFD700;
+        border-color: #FFD700;
     }
 
     .activity-item {
         padding: 15px;
-        border-left: 3px solid #667eea;
+        border-left: 3px solid #FFD700;
         background: #f8f9fa;
         border-radius: 5px;
         margin-bottom: 10px;
+        transition: all 0.3s ease;
+    }
+
+    .activity-item:hover {
+        background: #fff;
+        border-left-color: #1a1f3a;
+        box-shadow: 0 2px 10px rgba(255, 215, 0, 0.2);
     }
 
     .activity-date {
         font-size: 0.875rem;
-        color: #6c757d;
+        color: #FFD700;
+        font-weight: 600;
+    }
+
+    .form-control {
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+
+    .form-control:focus {
+        border-color: #FFD700;
+        box-shadow: 0 0 0 0.2rem rgba(255, 215, 0, 0.25);
+    }
+
+    .form-group label {
+        color: #1a1f3a;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        border: none;
+        color: white;
+        padding: 12px 30px;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-secondary:hover {
+        background: #1a1f3a;
+        color: #FFD700;
+        transform: translateY(-2px);
+    }
+
+    .badge-primary {
+        background: #1a1f3a;
+        color: #FFD700;
+        border: 1px solid #FFD700;
+    }
+
+    .badge-success {
+        background: #28a745;
+        color: white;
+    }
+
+    .breadcrumb-item.active {
+        color: #FFD700;
+    }
+
+    .breadcrumb-item a {
+        color: #1a1f3a;
+        text-decoration: none;
+        transition: color 0.3s ease;
+    }
+
+    .breadcrumb-item a:hover {
+        color: #FFD700;
+    }
+
+    .page-header .title h4 {
+        color: #1a1f3a;
+    }
+
+    .alert-success {
+        background-color: #d4edda;
+        border-color: #FFD700;
+        color: #1a1f3a;
+    }
+
+    .alert-danger {
+        background-color: #f8d7da;
+        border-color: #dc3545;
+        color: #721c24;
+    }
+
+    .alert-info {
+        background-color: #d1ecf1;
+        border-color: #FFD700;
+        color: #1a1f3a;
     }
 </style>
 
@@ -478,13 +571,13 @@ if ($role == 'ditbinmas') $role_display = 'Ditbinmas';
     document.getElementById('form-password').addEventListener('submit', function(e) {
         var passwordBaru = document.getElementById('password-baru').value;
         var passwordConfirm = document.getElementById('password-confirm').value;
-        
+
         if (passwordBaru !== passwordConfirm) {
             e.preventDefault();
             alert('Password baru dan konfirmasi password tidak cocok!');
             return false;
         }
-        
+
         if (passwordBaru.length < 6) {
             e.preventDefault();
             alert('Password minimal 6 karakter!');
@@ -494,6 +587,13 @@ if ($role == 'ditbinmas') $role_display = 'Ditbinmas';
 
     // Auto dismiss alert
     setTimeout(function() {
-        $('.alert').fadeOut('slow');
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(function(alert) {
+            alert.style.transition = 'opacity 0.5s';
+            alert.style.opacity = '0';
+            setTimeout(function() {
+                alert.style.display = 'none';
+            }, 500);
+        });
     }, 5000);
 </script>

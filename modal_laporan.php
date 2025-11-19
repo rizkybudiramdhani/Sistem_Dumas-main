@@ -214,10 +214,10 @@ if ($is_ajax_request) {
     }
 
     #modalLaporan .modal-header {
-        background: linear-gradient(135deg, #1E40AF, #1E3A8A);
+        background: #1E40AF;
         border-radius: 20px 20px 0 0;
         padding: 25px;
-        border-bottom: 2px solid #FFD700;
+        border-bottom: 3px solid #FFD700;
     }
 
     #modalLaporan .modal-title {
@@ -227,6 +227,13 @@ if ($is_ajax_request) {
 
     #modalLaporan .btn-close {
         filter: invert(1) grayscale(100%) brightness(200%);
+        opacity: 1;
+        transition: transform 0.3s ease;
+    }
+
+    #modalLaporan .btn-close:hover {
+        transform: rotate(90deg);
+        opacity: 0.8;
     }
 
     #modalLaporan .modal-body {
@@ -296,39 +303,53 @@ if ($is_ajax_request) {
     }
 
     #submitBtn {
-        background: linear-gradient(135deg, #FFD700, #FFC700);
+        background: #FFD700;
         border: none;
-        color: #1E3A8A;
+        color: #1E40AF;
         font-weight: 700;
         border-radius: 12px;
         padding: 15px;
+        transition: all 0.3s ease;
     }
 
     #submitBtn:hover {
-        background: linear-gradient(135deg, #FFC700, #FFD700);
+        background: #1E40AF;
+        color: #FFD700;
         transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
     }
 
     #submitBtn:disabled {
         opacity: 0.6;
+        cursor: not-allowed;
+        background: #6c757d;
+        color: #ffffff;
     }
 
     .alert {
         border-radius: 10px;
         padding: 15px;
         margin-bottom: 20px;
+        border: none;
     }
 
     .alert-success {
-        background: rgba(16, 185, 129, 0.15);
-        color: #10b981;
-        border-left: 4px solid #10b981;
+        background: #10b981;
+        color: #ffffff;
+        border-left: 4px solid #059669;
     }
 
     .alert-danger {
-        background: rgba(239, 68, 68, 0.15);
-        color: #ef4444;
-        border-left: 4px solid #ef4444;
+        background: #ef4444;
+        color: #ffffff;
+        border-left: 4px solid #dc2626;
+    }
+
+    .alert-info {
+        background: #1E40AF;
+        color: #FFD700;
+        border-left: 4px solid #FFD700;
+        font-weight: 600;
     }
 
     .form-text {
@@ -459,15 +480,26 @@ if ($is_ajax_request) {
 
         const laporanForm = document.getElementById('laporanForm');
         const modalLaporan = document.getElementById('modalLaporan');
+        const submitBtn = document.getElementById('submitBtn');
+
+        // Pastikan semua elemen ada sebelum menambahkan event listener
+        if (!laporanForm || !modalLaporan || !submitBtn) {
+            console.error('Element tidak ditemukan. Pastikan DOM sudah siap.');
+            return;
+        }
 
         // Pastikan tombol submit kembali normal saat modal dibuka/ditutup
         modalLaporan.addEventListener('hidden.bs.modal', function() {
-            document.getElementById('laporanMessage').innerHTML = '';
+            const messageDiv = document.getElementById('laporanMessage');
+            const spinner = submitBtn.querySelector('.spinner-border');
+            const btnText = document.getElementById('btnText');
+
+            if (messageDiv) messageDiv.innerHTML = '';
             laporanForm.reset();
             toggleAnonim();
-            document.getElementById('submitBtn').disabled = false;
-            document.getElementById('submitBtn').querySelector('.spinner-border').classList.add('d-none');
-            document.getElementById('btnText').textContent = 'Kirim Laporan';
+            submitBtn.disabled = false;
+            if (spinner) spinner.classList.add('d-none');
+            if (btnText) btnText.textContent = 'Kirim Laporan';
         });
 
         laporanForm.addEventListener('submit', function(e) {
@@ -505,34 +537,41 @@ if ($is_ajax_request) {
                     body: formData
                 })
                 .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Server error: ' + response.status);
+                    }
                     return response.text().then(text => {
                         // Mencoba parse JSON
                         try {
                             return JSON.parse(text);
                         } catch (e) {
                             console.error('JSON Parse Error:', e);
+                            console.error('Response text:', text);
                             // Jika gagal, tampilkan teks mentah sebagai error
-                            throw new Error('Respons bukan JSON valid. Server merespon: ' + text.substring(0, 100) + '...');
+                            throw new Error('Respons bukan JSON valid. Cek console untuk detail lengkap.');
                         }
                     });
                 })
                 .then(data => {
                     if (data.success) {
-                        messageDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle me-2"></i>' + data.message + '</div>';
-                        document.getElementById('laporanForm').reset();
+                        messageDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle-fill me-2"></i>' + data.message + '</div>';
+                        laporanForm.reset();
                         toggleAnonim();
 
+                        // Auto close modal setelah 3 detik
                         setTimeout(() => {
-                            const modal = bootstrap.Modal.getInstance(document.getElementById('modalLaporan'));
-                            if (modal) modal.hide();
+                            const modalInstance = bootstrap.Modal.getInstance(modalLaporan);
+                            if (modalInstance) {
+                                modalInstance.hide();
+                            }
                         }, 3000);
                     } else {
-                        messageDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>' + data.message + '</div>';
+                        messageDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-circle-fill me-2"></i>' + data.message + '</div>';
                     }
                 })
                 .catch(error => {
                     console.error('Fetch Error:', error);
-                    messageDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-x-circle me-2"></i>' + error.message + '</div>';
+                    messageDiv.innerHTML = '<div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Terjadi kesalahan: ' + error.message + '</div>';
                 })
                 .finally(() => {
                     submitBtn.disabled = false;

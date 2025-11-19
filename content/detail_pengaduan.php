@@ -35,16 +35,72 @@ if (isset($_POST['update_status'])) {
     $status_baru = mysqli_real_escape_string($db, $_POST['status_baru']);
     $tanggapan = mysqli_real_escape_string($db, $_POST['tanggapan']);
     $petugas = isset($_SESSION['nama']) ? $_SESSION['nama'] : 'Admin';
+    $role = isset($_SESSION['role']) ? strtolower($_SESSION['role']) : '';
 
-    $query_update = "UPDATE tabel_laporan 
-                     SET status_laporan = ?, 
-                         tanggapan_admin = ?, 
-                         tanggal_tanggapan = NOW() 
+    // Tentukan siapa yang memproses berdasarkan role
+    $sedang_diproses_oleh = '';
+    if (strpos($role, 'ditresnarkoba') !== false) {
+        $sedang_diproses_oleh = 'ditresnarkoba';
+    } elseif (strpos($role, 'ditsamapta') !== false) {
+        $sedang_diproses_oleh = 'ditsamapta';
+    } elseif (strpos($role, 'ditbinmas') !== false) {
+        $sedang_diproses_oleh = 'ditbinmas';
+    }
+
+    // Ambil timeline yang sudah ada
+    $existing_timeline = $laporan['timeline_json'] ?? '[]';
+    $timeline_array = json_decode($existing_timeline, true);
+    if (!is_array($timeline_array)) {
+        $timeline_array = [];
+    }
+
+    // Tambahkan entry baru ke timeline
+    $new_entry = [
+        'timestamp' => date('Y-m-d H:i:s'),
+        'status_dari' => $laporan['status_laporan'],
+        'status_ke' => $status_baru,
+        'diproses_oleh' => $sedang_diproses_oleh,
+        'nama_petugas' => $petugas,
+        'tanggapan' => $tanggapan
+    ];
+    $timeline_array[] = $new_entry;
+    $timeline_json = json_encode($timeline_array, JSON_UNESCAPED_UNICODE);
+
+    // Update tabel_laporan dengan timeline baru
+    $query_update = "UPDATE tabel_laporan
+                     SET status_laporan = ?,
+                         tanggapan_admin = ?,
+                         tanggal_tanggapan = NOW(),
+                         sedang_diproses_oleh = ?,
+                         timeline_json = ?
                      WHERE id_laporan = ?";
     $stmt_update = mysqli_prepare($db, $query_update);
-    mysqli_stmt_bind_param($stmt_update, "ssi", $status_baru, $tanggapan, $id_laporan);
+    mysqli_stmt_bind_param($stmt_update, "ssssi", $status_baru, $tanggapan, $sedang_diproses_oleh, $timeline_json, $id_laporan);
 
     if (mysqli_stmt_execute($stmt_update)) {
+        // Jika status = diproses_ditresnarkoba, set notifikasi untuk ditsamapta dan ditbinmas
+        if ($status_baru == 'diproses_ditresnarkoba') {
+            $query_notif = "UPDATE tabel_laporan
+                           SET is_notif_ditsamapta = 1, is_notif_ditbinmas = 1
+                           WHERE id_laporan = ?";
+            $stmt_notif = mysqli_prepare($db, $query_notif);
+            mysqli_stmt_bind_param($stmt_notif, "i", $id_laporan);
+            mysqli_stmt_execute($stmt_notif);
+        }
+
+        // Jika ditsamapta atau ditbinmas mengambil, clear notifikasi mereka
+        if ($status_baru == 'diproses_ditsamapta') {
+            $query_clear = "UPDATE tabel_laporan SET is_notif_ditsamapta = 0 WHERE id_laporan = ?";
+            $stmt_clear = mysqli_prepare($db, $query_clear);
+            mysqli_stmt_bind_param($stmt_clear, "i", $id_laporan);
+            mysqli_stmt_execute($stmt_clear);
+        } elseif ($status_baru == 'diproses_ditbinmas') {
+            $query_clear = "UPDATE tabel_laporan SET is_notif_ditbinmas = 0 WHERE id_laporan = ?";
+            $stmt_clear = mysqli_prepare($db, $query_clear);
+            mysqli_stmt_bind_param($stmt_clear, "i", $id_laporan);
+            mysqli_stmt_execute($stmt_clear);
+        }
+
         $success_message = 'Status berhasil diupdate!';
 
         // Refresh data
@@ -95,11 +151,12 @@ if (!empty($laporan['nama_pelapor'])) {
     }
 
     .detail-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: #1E40AF;
         color: white;
         padding: 30px;
         border-radius: 15px;
         margin-bottom: 30px;
+        border-bottom: 4px solid #FFD700;
     }
 
     .detail-title {
@@ -131,16 +188,36 @@ if (!empty($laporan['nama_pelapor'])) {
         gap: 8px;
     }
 
+    .badge-warning {
+        background-color: #FFD700;
+        color: #1E40AF;
+    }
+
+    .badge-info {
+        background-color: #1E40AF;
+        color: white;
+    }
+
+    .badge-success {
+        background-color: #28a745;
+        color: white;
+    }
+
+    .badge-secondary {
+        background-color: #6c757d;
+        color: white;
+    }
+
     .info-section {
         margin-bottom: 30px;
     }
 
     .info-section h5 {
-        color: #667eea;
+        color: #1E40AF;
         font-weight: 700;
         margin-bottom: 15px;
         padding-bottom: 10px;
-        border-bottom: 2px solid #e9ecef;
+        border-bottom: 2px solid #FFD700;
     }
 
     .info-grid {
@@ -154,7 +231,7 @@ if (!empty($laporan['nama_pelapor'])) {
         background: #f8f9fa;
         padding: 15px;
         border-radius: 10px;
-        border-left: 4px solid #667eea;
+        border-left: 4px solid #1E40AF;
     }
 
     .info-label {
@@ -173,7 +250,7 @@ if (!empty($laporan['nama_pelapor'])) {
         background: #f8f9fa;
         padding: 20px;
         border-radius: 10px;
-        border-left: 4px solid #667eea;
+        border-left: 4px solid #1E40AF;
         line-height: 1.8;
     }
 
@@ -228,16 +305,50 @@ if (!empty($laporan['nama_pelapor'])) {
         border-radius: 10px;
     }
 
-    .timeline-item::before {
-        content: '';
+    .timeline-item {
+        position: relative;
+        padding-left: 60px;
+        padding-top: 10px;
+        padding-bottom: 20px;
+        margin-bottom: 10px;
+    }
+
+    .timeline-badge {
         position: absolute;
-        left: -26px;
-        top: 20px;
-        width: 12px;
-        height: 12px;
+        left: -32px;
+        top: 15px;
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
-        background: #667eea;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.2rem;
         border: 3px solid #fff;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        z-index: 2;
+    }
+
+    .timeline-badge.bg-warning {
+        background: #FFD700;
+        color: #1E40AF;
+    }
+
+    .timeline-badge.bg-info {
+        background: #1E40AF;
+    }
+
+    .timeline-badge.bg-success {
+        background: #28a745;
+    }
+
+    .timeline-badge.bg-danger {
+        background: #dc3545;
+    }
+
+    .timeline-badge.bg-secondary {
+        background: #6c757d;
     }
 
     .action-buttons {
@@ -251,6 +362,7 @@ if (!empty($laporan['nama_pelapor'])) {
         border-radius: 8px;
         font-weight: 600;
         transition: all 0.3s ease;
+        cursor: pointer;
     }
 
     .btn-action:hover {
@@ -258,11 +370,49 @@ if (!empty($laporan['nama_pelapor'])) {
         box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
     }
 
+    .btn-primary.btn-action {
+        background: #1E40AF;
+        border-color: #1E40AF;
+        color: white;
+    }
+
+    .btn-primary.btn-action:hover {
+        background: #FFD700;
+        border-color: #FFD700;
+        color: #1E40AF;
+    }
+
+    .btn-secondary.btn-action {
+        background: #6c757d;
+        border-color: #6c757d;
+        color: white;
+    }
+
+    .btn-secondary.btn-action:hover {
+        background: #5a6268;
+        border-color: #545b62;
+    }
+
+    .btn-primary.btn-block {
+        background: #1E40AF;
+        border-color: #1E40AF;
+        color: white;
+        transition: all 0.3s ease;
+    }
+
+    .btn-primary.btn-block:hover {
+        background: #FFD700;
+        border-color: #FFD700;
+        color: #1E40AF;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);
+    }
+
     .tanggapan-box {
-        background: linear-gradient(135deg, #e0f7fa 0%, #e1f5fe 100%);
+        background: #e7f3ff;
         padding: 20px;
         border-radius: 10px;
-        border-left: 4px solid #00acc1;
+        border-left: 4px solid #1E40AF;
     }
 
     .no-tanggapan {
@@ -490,27 +640,84 @@ if (!empty($laporan['nama_pelapor'])) {
             <div class="info-section">
                 <h5>📊 Timeline Status</h5>
                 <div class="timeline">
+                    <!-- Laporan Dibuat -->
                     <div class="timeline-item">
+                        <div class="timeline-badge bg-warning">
+                            <i class="dw dw-inbox"></i>
+                        </div>
                         <strong>Laporan Dibuat</strong>
                         <div class="small text-muted">
-                            <?php echo date('d M Y, H:i', strtotime($laporan['tanggal_lapor'])); ?>
+                            <i class="dw dw-calendar1"></i>
+                            <?php echo date('d M Y, H:i', strtotime($laporan['tanggal_lapor'])); ?> WIB
                         </div>
                         <div class="mt-2">Status: <span class="badge badge-warning">Baru</span></div>
                     </div>
 
-                    <?php if ($laporan['tanggal_tanggapan'] != '0000-00-00 00:00:00'): ?>
+                    <?php
+                    // Get timeline dari JSON
+                    $timeline_json = $laporan['timeline_json'] ?? '[]';
+                    $timeline_array = json_decode($timeline_json, true);
+
+                    if (is_array($timeline_array) && count($timeline_array) > 0):
+                        foreach ($timeline_array as $timeline):
+                            // Determine badge color based on status
+                            $badge_color = 'secondary';
+                            $badge_icon = 'dw-loading';
+                            $timeline_bg = 'bg-secondary';
+
+                            if (strpos($timeline['status_ke'], 'diproses') !== false) {
+                                $badge_color = 'info';
+                                $badge_icon = 'dw-loading';
+                                $timeline_bg = 'bg-info';
+                            }
+                            if (strpos($timeline['status_ke'], 'selesai') !== false) {
+                                $badge_color = 'success';
+                                $badge_icon = 'dw-checked';
+                                $timeline_bg = 'bg-success';
+                            }
+                            if (strpos($timeline['status_ke'], 'ditolak') !== false) {
+                                $badge_color = 'danger';
+                                $badge_icon = 'dw-warning';
+                                $timeline_bg = 'bg-danger';
+                            }
+
+                            // Format status ke title case
+                            $status_display = str_replace('_', ' ', $timeline['status_ke']);
+                            $status_display = ucwords($status_display);
+
+                            // Role badge
+                            $role_badge = '';
+                            if ($timeline['diproses_oleh'] == 'ditresnarkoba') {
+                                $role_badge = '<span class="badge badge-dark ml-2">Ditresnarkoba</span>';
+                            } elseif ($timeline['diproses_oleh'] == 'ditsamapta') {
+                                $role_badge = '<span class="badge badge-primary ml-2">Ditsamapta</span>';
+                            } elseif ($timeline['diproses_oleh'] == 'ditbinmas') {
+                                $role_badge = '<span class="badge badge-success ml-2">Ditbinmas</span>';
+                            }
+                    ?>
                         <div class="timeline-item">
-                            <strong>Ditanggapi Petugas</strong>
+                            <div class="timeline-badge <?php echo $timeline_bg; ?>">
+                                <i class="dw <?php echo $badge_icon; ?>"></i>
+                            </div>
+                            <strong><?php echo $status_display; ?></strong>
+                            <?php echo $role_badge; ?>
+                            <div class="small text-muted mt-1">
+                                <i class="dw dw-user1"></i> <?php echo htmlspecialchars($timeline['nama_petugas']); ?>
+                            </div>
                             <div class="small text-muted">
-                                <?php echo date('d M Y, H:i', strtotime($laporan['tanggal_tanggapan'])); ?>
+                                <i class="dw dw-calendar1"></i>
+                                <?php echo date('d M Y, H:i', strtotime($timeline['timestamp'])); ?> WIB
                             </div>
-                            <div class="mt-2">
-                                Status: <span class="badge badge-<?php echo $status_class; ?>">
-                                    <?php echo ucfirst($laporan['status_laporan']); ?>
-                                </span>
-                            </div>
+                            <?php if (!empty($timeline['tanggapan'])): ?>
+                                <div class="mt-2 p-2 bg-light rounded">
+                                    <small><i class="dw dw-chat"></i> <?php echo nl2br(htmlspecialchars($timeline['tanggapan'])); ?></small>
+                                </div>
+                            <?php endif; ?>
                         </div>
-                    <?php endif; ?>
+                    <?php
+                        endforeach;
+                    endif;
+                    ?>
                 </div>
             </div>
         </div>
@@ -524,24 +731,75 @@ if (!empty($laporan['nama_pelapor'])) {
                         <label class="font-weight-600">Status Baru</label>
                         <select class="form-control" name="status_baru" required>
                             <?php
-                            $session_nama = isset($_SESSION['role']) ? strtolower($_SESSION['role']) : '';
-                            if (strpos($session_nama, 'ditresnarkoba') !== false) {
-                                echo '<option value="baru" ' . ($laporan['status_laporan'] == 'baru' ? 'selected' : '') . '>Baru</option>';
+                            $session_role = isset($_SESSION['role']) ? strtolower($_SESSION['role']) : '';
+                            $current_status = $laporan['status_laporan'];
+
+                            // DITRESNARKOBA - Aktor pertama
+                            if (strpos($session_role, 'ditresnarkoba') !== false) {
+                                echo '<option value="baru" ' . ($current_status == 'baru' ? 'selected' : '') . '>Baru</option>';
+                                echo '<option value="diproses_ditresnarkoba" ' . ($current_status == 'diproses_ditresnarkoba' ? 'selected' : '') . '>Diproses Ditresnarkoba</option>';
+                                echo '<option value="selesai" ' . ($current_status == 'selesai' ? 'selected' : '') . '>Selesai</option>';
+                                echo '<option value="ditolak" ' . ($current_status == 'ditolak' ? 'selected' : '') . '>Ditolak</option>';
                             }
-                            if (strpos($session_nama, 'ditsamapta') !== false) {
-                                echo '<option value="diproses ditsamapta" ' . ($laporan['status_laporan'] == 'diproses ditsamapta' ? 'selected' : '') . '>Diproses Ditsamapta</option>';
-                                echo '<option value="selesai ditsamapta" ' . ($laporan['status_laporan'] == 'selesai ditsamapta' ? 'selected' : '') . '>Selesai Ditsamapta</option>';
+
+                            // DITSAMAPTA - Aktor kedua (bisa akses jika sudah diproses_ditresnarkoba)
+                            if (strpos($session_role, 'ditsamapta') !== false) {
+                                // Cek apakah sudah diproses Ditresnarkoba
+                                $bisa_akses = ($current_status == 'diproses_ditresnarkoba' ||
+                                              $current_status == 'diproses_ditsamapta' ||
+                                              $current_status == 'diproses_ditbinmas' ||
+                                              $current_status == 'selesai_ditsamapta' ||
+                                              $current_status == 'selesai_ditbinmas');
+
+                                if ($bisa_akses) {
+                                    // Hanya tampilkan "diproses" jika belum selesai Ditsamapta
+                                    if ($current_status != 'selesai_ditsamapta') {
+                                        echo '<option value="diproses_ditsamapta" ' . ($current_status == 'diproses_ditsamapta' ? 'selected' : '') . '>Diproses Ditsamapta</option>';
+                                    }
+                                    // Hanya bisa selesai jika sudah diproses Ditsamapta
+                                    if ($current_status == 'diproses_ditsamapta') {
+                                        echo '<option value="selesai_ditsamapta" ' . ($current_status == 'selesai_ditsamapta' ? 'selected' : '') . '>Selesai Ditsamapta</option>';
+                                    }
+                                    if ($current_status == 'selesai_ditsamapta') {
+                                        echo '<option value="selesai_ditsamapta" selected disabled>Selesai Ditsamapta</option>';
+                                    }
+                                } else {
+                                    echo '<option value="" disabled selected>Belum dapat diproses (tunggu Ditresnarkoba)</option>';
+                                }
                             }
-                            if (strpos($session_nama, 'ditbinmas') !== false) {
-                                echo '<option value="diproses ditbinmas" ' . ($laporan['status_laporan'] == 'diproses ditbinmas' ? 'selected' : '') . '>Diproses Ditbinmas</option>';
-                                echo '<option value="selesai ditbinmas" ' . ($laporan['status_laporan'] == 'selesai ditbinmas' ? 'selected' : '') . '>Selesai Ditbinmas</option>';
-                            }
-                            if (strpos($session_nama, 'ditresnarkoba') !== false) {
-                                echo '<option value="diproses ditresnarkoba" ' . ($laporan['status_laporan'] == 'diproses ditresnarkoba' ? 'selected' : '') . '>Diproses Ditresnarkoba</option>';
-                                echo '<option value="selesai" ' . ($laporan['status_laporan'] == 'selesai' ? 'selected' : '') . '>Selesai</option>';
+
+                            // DITBINMAS - Aktor kedua (bisa akses jika sudah diproses_ditresnarkoba)
+                            if (strpos($session_role, 'ditbinmas') !== false) {
+                                // Cek apakah sudah diproses Ditresnarkoba
+                                $bisa_akses = ($current_status == 'diproses_ditresnarkoba' ||
+                                              $current_status == 'diproses_ditsamapta' ||
+                                              $current_status == 'diproses_ditbinmas' ||
+                                              $current_status == 'selesai_ditsamapta' ||
+                                              $current_status == 'selesai_ditbinmas');
+
+                                if ($bisa_akses) {
+                                    // Hanya tampilkan "diproses" jika belum selesai Ditbinmas
+                                    if ($current_status != 'selesai_ditbinmas') {
+                                        echo '<option value="diproses_ditbinmas" ' . ($current_status == 'diproses_ditbinmas' ? 'selected' : '') . '>Diproses Ditbinmas</option>';
+                                    }
+                                    // Hanya bisa selesai jika sudah diproses Ditbinmas
+                                    if ($current_status == 'diproses_ditbinmas') {
+                                        echo '<option value="selesai_ditbinmas" ' . ($current_status == 'selesai_ditbinmas' ? 'selected' : '') . '>Selesai Ditbinmas</option>';
+                                    }
+                                    if ($current_status == 'selesai_ditbinmas') {
+                                        echo '<option value="selesai_ditbinmas" selected disabled>Selesai Ditbinmas</option>';
+                                    }
+                                } else {
+                                    echo '<option value="" disabled selected>Belum dapat diproses (tunggu Ditresnarkoba)</option>';
+                                }
                             }
                             ?>
                         </select>
+                        <small class="form-text text-muted">
+                            <?php if (strpos($session_role, 'ditsamapta') !== false || strpos($session_role, 'ditbinmas') !== false): ?>
+                                <i class="bi bi-info-circle"></i> Anda dapat mengambil laporan ini setelah Ditresnarkoba memproses terlebih dahulu
+                            <?php endif; ?>
+                        </small>
                     </div>
 
                     <div class="form-group">
@@ -569,14 +827,22 @@ if (!empty($laporan['nama_pelapor'])) {
 
 <script>
     function openLightbox(imageSrc) {
-        document.getElementById('lightbox').classList.add('active');
-        document.getElementById('lightbox-img').src = imageSrc;
-        document.body.style.overflow = 'hidden';
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+
+        if (lightbox && lightboxImg) {
+            lightbox.classList.add('active');
+            lightboxImg.src = imageSrc;
+            document.body.style.overflow = 'hidden';
+        }
     }
 
     function closeLightbox() {
-        document.getElementById('lightbox').classList.remove('active');
-        document.body.style.overflow = 'auto';
+        const lightbox = document.getElementById('lightbox');
+        if (lightbox) {
+            lightbox.classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
     }
 
     // Close lightbox on ESC key
@@ -586,8 +852,52 @@ if (!empty($laporan['nama_pelapor'])) {
         }
     });
 
-    // Auto dismiss alert
-    setTimeout(function() {
-        $('.alert').fadeOut('slow');
-    }, 5000);
+    // Prevent lightbox close when clicking on image
+    document.addEventListener('DOMContentLoaded', function() {
+        const lightboxImg = document.getElementById('lightbox-img');
+        if (lightboxImg) {
+            lightboxImg.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        }
+
+        // Auto dismiss alert
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                alert.style.transition = 'opacity 0.5s ease';
+                alert.style.opacity = '0';
+                setTimeout(function() {
+                    alert.style.display = 'none';
+                }, 500);
+            });
+        }, 5000);
+
+        // Validate form before submit
+        const updateForm = document.querySelector('form[method="POST"]');
+        if (updateForm) {
+            updateForm.addEventListener('submit', function(e) {
+                const statusSelect = this.querySelector('select[name="status_baru"]');
+                const tanggapanTextarea = this.querySelector('textarea[name="tanggapan"]');
+
+                if (!statusSelect.value || !tanggapanTextarea.value.trim()) {
+                    e.preventDefault();
+                    alert('Mohon lengkapi semua field yang diperlukan!');
+                    return false;
+                }
+            });
+        }
+
+        // Add confirmation for update status
+        const updateBtn = document.querySelector('button[name="update_status"]');
+        if (updateBtn) {
+            updateBtn.addEventListener('click', function(e) {
+                const confirmed = confirm('Apakah Anda yakin ingin mengupdate status laporan ini?');
+                if (!confirmed) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+        }
+    });
 </script>

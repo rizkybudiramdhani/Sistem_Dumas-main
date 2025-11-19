@@ -310,14 +310,14 @@
             if (btnLaporHero) {
                 btnLaporHero.addEventListener('click', function(e) {
                     e.preventDefault();
-                    const isLoggedIn = <?php echo isset($_SESSION['user_id']) ? 'true' : 'false'; ?>;
 
-                    if (isLoggedIn) {
-                        const modal = new bootstrap.Modal(document.getElementById('modalLaporan'));
+                    // Selalu buka modal laporan (karena ada opsi anonim)
+                    const modalLaporan = document.getElementById('modalLaporan');
+                    if (modalLaporan) {
+                        const modal = new bootstrap.Modal(modalLaporan);
                         modal.show();
                     } else {
-                        const modal = new bootstrap.Modal(document.getElementById('modalLogin'));
-                        modal.show();
+                        console.error('Modal laporan tidak ditemukan');
                     }
                 });
             }
